@@ -1,11 +1,12 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const ytdl = require('ytdl-core');
 const mkdirSync = require('mkdir-recursive').mkdirSync;
 const puppeteer = require('puppeteer');
 const inquirer = require('inquirer');
-var sanitize = require("sanitize-filename");
-
+const sanitize = require("sanitize-filename");
+const tmpDir = os.tmpdir();
 /* eslint-disable no-console */
 /* eslint-disable max-params */
 
@@ -19,6 +20,7 @@ const numberToString = function(num) {
 const downloadUrl = (url, folder, title) => {
     mkdirSync(folder);
     const filePath = path.join(folder, title + '.mp4');
+    const tempFilePath = path.join(tmpDir, title + '.mp4');
     let stats;
     try {
         // Query the entry
@@ -31,7 +33,7 @@ const downloadUrl = (url, folder, title) => {
     catch (e) {
         // ...
     }
-    const fileStream = fs.createWriteStream(filePath)
+    const fileStream = fs.createWriteStream(tempFilePath)
     const video = ytdl(url.replace('embed', 'watch'), { filter: (format) => format.container === 'mp4' });
     let starttime;
     var end = new Promise(function(resolve, reject) {
@@ -56,7 +58,9 @@ const downloadUrl = (url, folder, title) => {
       });
     video.on('end', () => {
         console.log('\n');
+        fs.renameSync(tempFilePath, filePath)
         console.log('Saved to', filePath);
+
     });
     return end;
 }
@@ -73,11 +77,19 @@ const downloadChapters = async (page, chapters, course, options) => {
             console.warn('Skipping', chapter.name);
             continue;
         }
-        await page.goto(chapter.value).catch(async (e) => {
-            console.error('failed navigate to', chapter.value)
-            await page.screenshot({ path: "error.png" })
-            throw e;
-        })
+
+        if (chapter.name.indexOf("Quiz") === 0) {
+            console.warn('Skipping', chapter.name);
+            continue;
+        }
+        await page.goto(chapter.value)
+        .catch(async (e1) => {
+            console.error('failed navigate to', chapter.value, e1, 'retry')
+            await page.goto(chapter.value).catch(e2 => {
+                console.error('failed navigate to', chapter.value, e2)
+                throw e2;
+            })
+        });
         // await page.waitForNavigation();
         const src = await page.$eval("iframe[title='YouTube video player']", el => el.src, {timeout: 5000})
         .catch(() => {
@@ -86,9 +98,12 @@ const downloadChapters = async (page, chapters, course, options) => {
         if (src) {
             const folder = path.join(options.root_path, sanitize(course), sanitize(chapter.module));
             await downloadUrl(src, folder, sanitize('Chapitre ' + numberToString(index) + ' ' + chapter.name))
-            .catch(async (e) => {
-                await page.screenshot({ path: "error.png" })
-                console.error(e, 'on', src);
+            .catch(async () => {
+                // silent retry
+                await downloadUrl(src, folder, sanitize('Chapitre ' + numberToString(index) + ' ' + chapter.name))
+                .catch(e => {
+                    console.error(e, 'on', src);
+                })
             });
         }
         console.groupEnd();
