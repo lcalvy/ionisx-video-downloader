@@ -1,0 +1,18 @@
+{
+  "name": "ionisx-video-downloader",
+  "version": "1.0.0",
+  "description": "Download all ionisx.com videos",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Loïc Calvy",
+  "license": "ISC",
+  "dependencies": {
+    "inquirer": "^6.2.1",
+    "mkdir-recursive": "^0.4.0",
+    "puppeteer": "^1.11.0",
+    "sanitize-filename": "^1.6.1",
+    "ytdl-core": "^0.28.3"
+  }
+}
