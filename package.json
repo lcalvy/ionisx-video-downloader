@@ -4,7 +4,7 @@
   "description": "Download all ionisx.com videos",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "eslint indeX.js"
   },
   "author": "Loïc Calvy",
   "license": "ISC",
@@ -14,5 +14,8 @@
     "puppeteer": "^1.11.0",
     "sanitize-filename": "^1.6.1",
     "ytdl-core": "^0.28.3"
+  },
+  "devDependencies": {
+    "eslint": "^5.11.1"
   }
 }

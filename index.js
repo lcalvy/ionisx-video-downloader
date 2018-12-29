@@ -6,6 +6,8 @@ const puppeteer = require('puppeteer');
 const inquirer = require('inquirer');
 var sanitize = require("sanitize-filename");
 
+/* eslint-disable no-console */
+
 const ROOT_DOWNLOAD = path.join('.','download');
 
 const numberToString = function(num) {
@@ -76,7 +78,7 @@ const downloadChapters = async (page, chapters, course) => {
         })
         // await page.waitForNavigation();
         const src = await page.$eval("iframe[title='YouTube video player']", el => el.src, {timeout: 5000})
-        .catch(e => {
+        .catch(() => {
             console.log('No video available');
         })
         if (src) {
