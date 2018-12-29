@@ -4,8 +4,8 @@
   "description": "Download all ionisx.com videos",
   "main": "index.js",
   "scripts": {
-    "start": "node indeX.js",
-    "test": "eslint indeX.js"
+    "start": "node index.js",
+    "test": "eslint index.js"
   },
   "author": "Loïc Calvy",
   "license": "ISC",
