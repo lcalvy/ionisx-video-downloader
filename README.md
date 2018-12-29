@@ -1,3 +1,5 @@
+[![Build Status](https://www.travis-ci.org/lcalvy/ionisx-video-downloader.svg?branch=master)](https://www.travis-ci.org/lcalvy/ionisx-video-downloader)
+
 Ce module permet de scanner des cours sur la plateforme ionisx.com et de télécharger les vidéos
 
 * Installer NodeJs 10.15.0 minimum
