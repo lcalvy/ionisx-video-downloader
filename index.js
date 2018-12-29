@@ -7,6 +7,7 @@ const inquirer = require('inquirer');
 var sanitize = require("sanitize-filename");
 
 /* eslint-disable no-console */
+/* eslint-disable max-params */
 
 const ROOT_DOWNLOAD = path.join('.','download');
 
@@ -60,7 +61,8 @@ const downloadUrl = (url, folder, title) => {
     return end;
 }
 
-const downloadChapters = async (page, chapters, course) => {
+
+const downloadChapters = async (page, chapters, course, options) => {
     console.group('Chapters');
     console.log(`Discovering ${chapters.length} chapters`)
     let index = 0;
@@ -82,7 +84,7 @@ const downloadChapters = async (page, chapters, course) => {
             console.log('No video available');
         })
         if (src) {
-            const folder = path.join(ROOT_DOWNLOAD, sanitize(course), sanitize(chapter.module));
+            const folder = path.join(options.root_path, sanitize(course), sanitize(chapter.module));
             await downloadUrl(src, folder, sanitize('Chapitre ' + numberToString(index) + ' ' + chapter.name))
             .catch(async (e) => {
                 await page.screenshot({ path: "error.png" })
@@ -95,7 +97,7 @@ const downloadChapters = async (page, chapters, course) => {
 }
 
 
-const collectChapters = async (page, modules, course) => {
+const collectChapters = async (page, modules, course, options) => {
     console.group('Modules');
     console.log(`Discovering ${modules.length} modules`)
     let index = 0;
@@ -115,7 +117,7 @@ const collectChapters = async (page, modules, course) => {
             return newChapter;
         })
 
-        await downloadChapters(page, newChapters, course.title).catch(async (e) => {
+        await downloadChapters(page, newChapters, course.title, options).catch(async (e) => {
             await page.screenshot({ path: "error.png" })
             throw e;
         });
@@ -126,7 +128,7 @@ const collectChapters = async (page, modules, course) => {
     
 }
 
-const collectModules = async (page, course) => {
+const collectModules = async (page, course, options) => {
     console.group('Courses ' + course.title);
     console.log('Loading course page')
     await page.goto(course.href);
@@ -138,7 +140,7 @@ const collectModules = async (page, course) => {
         return modules;
     })
 
-    await collectChapters(page, modules, course).catch(async (e) => {
+    await collectChapters(page, modules, course, options).catch(async (e) => {
         await page.screenshot({ path: "error.png" })
         throw e;
     });
@@ -172,6 +174,12 @@ const promptCredentials = async () => {
         name: 'password',
         message: 'Quel est votre mot de passe (ne sera pas stocké) ? ',
         default : process.argv[3]
+    },
+    {
+        type: 'input',
+        name: 'root_path',
+        message: 'Dossier de télécahrgement',
+        default : ROOT_DOWNLOAD
     }
     ];
     
@@ -211,7 +219,7 @@ const launch = async () => {
     })
 
     const answers  = await promptCourses(courses);
-    await collectModules(page, answers.courses)
+    await collectModules(page, answers.courses, credentials)
     .catch(async (e) => {
         await page.screenshot({ path: "error.png" })
         throw e;
