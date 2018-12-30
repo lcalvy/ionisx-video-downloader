@@ -242,7 +242,7 @@ const promptCredentials = async () => {
 
 const launch = async () => {
     const credentials  = await promptCredentials();
-    const browser = await puppeteer.launch({headless: false});
+    const browser = await puppeteer.launch({headless: true});
     const url = 'https://ionisx.com/auth/azure-ecoles';
     const page = await browser.newPage();
     page.on('dialog', async dialog => {
