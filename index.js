@@ -11,11 +11,34 @@ const tmpDir = os.tmpdir();
 /* eslint-disable max-params */
 
 const ROOT_DOWNLOAD = path.join('.','download');
-
+const errors = [];
+let numberProcessedVideos = 0;
+let numberDownloadedVideos = 0;
 const numberToString = function(num) {
     const longString = ('000'  + num);
     return longString.substring(longString.length -3, longString.length);
 } 
+
+const sleep = function(ms) {
+    return new Promise(resolve => {
+        setTimeout(resolve,ms)
+    })
+}
+
+const retryNavigate = async (page, url, contextInfo) => {
+    await page.goto(url, {timeout: 10000})
+        .catch(async (e1) => {
+            console.warn(e1);
+            await sleep(5000);
+            await page.goto('https://ionisx.com/dashboard');
+            await page.goto(url).catch(async (e2) => {
+                console.error(e2)
+                await page.screenshot({ path: sanitize(url) + '.png' });
+                errors.push(`Unable to navigate to ${contextInfo} ${url}`)
+                throw new Error(`Unable to navigate to ${contextInfo} ${url}`)
+            })
+        });
+}
 
 const downloadUrl = (url, folder, title) => {
     mkdirSync(folder);
@@ -60,7 +83,7 @@ const downloadUrl = (url, folder, title) => {
         console.log('\n');
         fs.renameSync(tempFilePath, filePath)
         console.log('Saved to', filePath);
-
+        numberDownloadedVideos++;
     });
     return end;
 }
@@ -75,34 +98,40 @@ const downloadChapters = async (page, chapters, course, options) => {
         console.group(`Chapter ${numberToString(index)} : ${chapter.name}`);
         if (chapter.name === "S'évaluer") {
             console.warn('Skipping', chapter.name);
+            console.groupEnd();
             continue;
         }
 
         if (chapter.name.indexOf("Quiz") === 0) {
             console.warn('Skipping', chapter.name);
+            console.groupEnd();
             continue;
         }
-        await page.goto(chapter.value)
-        .catch(async (e1) => {
-            console.error('failed navigate to', chapter.value, e1, 'retry')
-            await page.goto(chapter.value).catch(e2 => {
-                console.error('failed navigate to', chapter.value, e2)
-                throw e2;
-            })
-        });
-        // await page.waitForNavigation();
+
+        try {
+            await retryNavigate(page, chapter.value, `${course} ${chapter.name}`)
+        }
+        catch(e) {
+            console.error(e);
+            console.groupEnd();
+            continue;
+        }
+        
         const src = await page.$eval("iframe[title='YouTube video player']", el => el.src, {timeout: 5000})
         .catch(() => {
             console.log('No video available');
         })
         if (src) {
+            numberProcessedVideos++;
+            const videoTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index)} ${chapter.name}`);
             const folder = path.join(options.root_path, sanitize(course), sanitize(chapter.module));
-            await downloadUrl(src, folder, sanitize('Chapitre ' + numberToString(index) + ' ' + chapter.name))
+            await downloadUrl(src, folder, videoTitle)
             .catch(async () => {
                 // silent retry
-                await downloadUrl(src, folder, sanitize('Chapitre ' + numberToString(index) + ' ' + chapter.name))
+                await downloadUrl(src, folder, videoTitle)
                 .catch(e => {
                     console.error(e, 'on', src);
+                    errors.push(`Unable to download video ${course} ${chapter.name} ${src}`)
                 })
             });
         }
@@ -119,7 +148,14 @@ const collectChapters = async (page, modules, course, options) => {
     for (const module of modules) {
         index++;
         console.group(`Module ${numberToString(index)} : ${module.name}`);
-        await page.goto(module.value);
+        try {
+            await retryNavigate(page, module.value, module.name);
+        }
+        catch (e) {
+            console.error(e);
+            console.groupEnd();
+            continue;
+        }
         await page.waitForSelector('.chapter li');
         let newChapters = await page.evaluate(() => {
             const chapters = [];
@@ -129,11 +165,13 @@ const collectChapters = async (page, modules, course, options) => {
 
         newChapters = newChapters.map(newChapter => {
             newChapter.module = 'Module ' + numberToString(index) + ' ' + module.name;
+            newChapter.moduleNum = numberToString(index);
             return newChapter;
         })
 
         await downloadChapters(page, newChapters, course.title, options).catch(async (e) => {
             await page.screenshot({ path: "error.png" })
+            console.groupEnd();
             throw e;
         });
         console.groupEnd();
@@ -146,7 +184,7 @@ const collectChapters = async (page, modules, course, options) => {
 const collectModules = async (page, course, options) => {
     console.group('Courses ' + course.title);
     console.log('Loading course page')
-    await page.goto(course.href);
+    await retryNavigate(page, course.href, course.title);
     await page.waitForSelector('.course-component-module-title');
     console.log('Discovering modules')
     const modules = await page.evaluate(() => {
@@ -203,11 +241,14 @@ const promptCredentials = async () => {
 
 
 const launch = async () => {
-    try {
     const credentials  = await promptCredentials();
-    const browser = await puppeteer.launch({headless: true});
+    const browser = await puppeteer.launch({headless: false});
     const url = 'https://ionisx.com/auth/azure-ecoles';
     const page = await browser.newPage();
+    page.on('dialog', async dialog => {
+    console.log(dialog.message());
+        await dialog.accept();
+    });
     await page.setViewport({ width: 1980, height: 1260 })
     await page.goto(url);
     console.log(`Connecting on office 365`)
@@ -241,14 +282,20 @@ const launch = async () => {
     })
 
     await browser.close();
-    }
-    catch(e) {
-        console.error(e);
-        process.exit(2);
-    }
 }
 
-launch().catch(e => {
+launch()
+.then(() => {
+    if (errors.length > 0) {
+        console.error("\x1b[31m", 'Job finished but some errors occured :');
+        errors.forEach(error => {
+            console.error("\x1b[31m", error);
+        })
+    }
+    console.log(`Finished, enjoy learning: Videos processed=${numberProcessedVideos}, Videos downloaded=${numberDownloadedVideos}`);
+    process.exit(0);
+})
+.catch(e => {
     console.error(e);
     process.exit(1);
 });
