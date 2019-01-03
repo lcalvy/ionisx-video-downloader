@@ -24,7 +24,7 @@ const sleep = function(ms) {
 
 const retryNavigate = async (page, url, contextInfo) => {
     await page.goto(url, {timeout: 10000})
-        .catch(async (e1) => {
+        .catch(async () => {
             await sleep(5000);
             await page.goto('https://ionisx.com/dashboard');
             await page.goto(url).catch(async (e2) => {
