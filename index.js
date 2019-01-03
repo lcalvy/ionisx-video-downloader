@@ -1,14 +1,11 @@
-const fs = require('fs');
-const os = require('os');
+/* eslint-disable max-lines */
+/* eslint-disable no-console */
+/* eslint-disable max-params */
 const path = require('path');
-const ytdl = require('ytdl-core');
-const mkdirSync = require('mkdir-recursive').mkdirSync;
 const puppeteer = require('puppeteer');
 const inquirer = require('inquirer');
 const sanitize = require("sanitize-filename");
-const tmpDir = os.tmpdir();
-/* eslint-disable no-console */
-/* eslint-disable max-params */
+const videoLib = require('./lib/video');
 
 const ROOT_DOWNLOAD = path.join('.','download');
 const errors = [];
@@ -40,54 +37,64 @@ const retryNavigate = async (page, url, contextInfo) => {
         });
 }
 
-const downloadUrl = (url, folder, title) => {
-    mkdirSync(folder);
-    const filePath = path.join(folder, title + '.mp4');
-    const tempFilePath = path.join(tmpDir, title + '.mp4');
-    let stats;
-    try {
-        // Query the entry
-        stats = fs.lstatSync(filePath);
-        if (stats.size > 0) {
-            console.log('Already downloaded to', filePath);
-            return Promise.resolve();
+const lookupYoutube = async (page, chapter, course, rootPath, index) => {
+    const srcYoutube = await page.$eval("iframe[title='YouTube video player']", el => el.src, {timeout: 5000})
+        .catch(() => {
+            console.log('No Youtube embed video available');
+        })
+        if (!srcYoutube) {
+            return false;
         }
-    }
-    catch (e) {
-        // ...
-    }
-    const fileStream = fs.createWriteStream(tempFilePath)
-    const video = ytdl(url.replace('embed', 'watch'), { filter: (format) => format.container === 'mp4' });
-    let starttime;
-    var end = new Promise(function(resolve, reject) {
-        fileStream.on('finish', resolve);
-        fileStream.on('error', reject);
-        video.on('error', reject);
-        video.pipe(fileStream).on('error', reject); // or something like that. might need to close `hash`
-    });
-    video.once('response', () => {
-        starttime = Date.now();
-    });
-    video.on('progress', (chunkLength, downloaded, total) => {
-        const readline = require('readline');
-        const percent = downloaded / total;
-        const downloadedMinutes = (Date.now() - starttime) / 1000 / 60;
-        readline.cursorTo(process.stdout, 0);
-        process.stdout.write(`${(percent * 100).toFixed(2)}% downloaded`);
-        process.stdout.write(`(${(downloaded / 1024 / 1024).toFixed(2)}MB of ${(total / 1024 / 1024).toFixed(2)}MB)\n`);
-        process.stdout.write(`running for: ${downloadedMinutes.toFixed(2)}minutes`);
-        process.stdout.write(`, estimated time left: ${(downloadedMinutes / percent - downloadedMinutes).toFixed(2)}minutes `);
-        readline.moveCursor(process.stdout, 0, -1);
-      });
-    video.on('end', () => {
-        console.log('\n');
-        fs.renameSync(tempFilePath, filePath)
-        console.log('Saved to', filePath);
-        numberDownloadedVideos++;
-    });
-    return end;
+        
+        numberProcessedVideos++;
+        const videoTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index)} ${chapter.name}`);
+        const folder = path.join(rootPath, sanitize(course), sanitize(chapter.module));
+        try {
+            await videoLib.downloadYoutubeUrl(srcYoutube, folder, videoTitle);
+            numberDownloadedVideos++;
+        }
+        catch(e1) {
+            try {
+                await videoLib.downloadYoutubeUrl(srcYoutube, folder, videoTitle);
+                numberDownloadedVideos++;
+            }
+            catch(e2) {
+                console.error(e2, 'on', srcYoutube);
+                errors.push(`Unable to download video ${course} ${chapter.name} ${srcYoutube}`)
+            }
+        }
+        return true;
 }
 
+
+const lookupHtmlVideo = async (page, chapter, course, rootPath, index) => {
+    const srcVideo = await page.$eval("video source", el => el.src, {timeout: 5000})
+        .catch(() => {
+            console.log('No video player available');
+        })
+        if (!srcVideo) {
+            return false;
+        }
+        
+        numberProcessedVideos++;
+        const videoTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index)} ${chapter.name}`);
+        const folder = path.join(rootPath, sanitize(course), sanitize(chapter.module));
+        try {
+            await videoLib.downloadFile(srcVideo, folder, videoTitle);
+            numberDownloadedVideos++;
+        }
+        catch(e1) {
+            try {
+                await videoLib.downloadFile(srcVideo, folder, videoTitle);
+                numberDownloadedVideos++;
+            }
+            catch(e2) {
+                console.error(e2, 'on', srcVideo);
+                errors.push(`Unable to download video ${course} ${chapter.name} ${srcVideo}`)
+            }
+        }
+        return true;
+}
 
 const downloadChapters = async (page, chapters, course, options) => {
     console.group('Chapters');
@@ -117,24 +124,12 @@ const downloadChapters = async (page, chapters, course, options) => {
             continue;
         }
         
-        const src = await page.$eval("iframe[title='YouTube video player']", el => el.src, {timeout: 5000})
-        .catch(() => {
-            console.log('No video available');
-        })
-        if (src) {
-            numberProcessedVideos++;
-            const videoTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index)} ${chapter.name}`);
-            const folder = path.join(options.root_path, sanitize(course), sanitize(chapter.module));
-            await downloadUrl(src, folder, videoTitle)
-            .catch(async () => {
-                // silent retry
-                await downloadUrl(src, folder, videoTitle)
-                .catch(e => {
-                    console.error(e, 'on', src);
-                    errors.push(`Unable to download video ${course} ${chapter.name} ${src}`)
-                })
-            });
+        const found = await lookupYoutube(page, chapter, course, options.root_path, index);
+        if (!found) {
+            await lookupHtmlVideo(page, chapter, course, options.root_path, index);
         }
+       
+        
         console.groupEnd();
     }
     console.groupEnd();
@@ -144,10 +139,8 @@ const downloadChapters = async (page, chapters, course, options) => {
 const collectChapters = async (page, modules, course, options) => {
     console.group('Modules');
     console.log(`Discovering ${modules.length} modules`)
-    let index = 0;
     for (const module of modules) {
-        index++;
-        console.group(`Module ${numberToString(index)} : ${module.name}`);
+        console.group(`Module ${numberToString(module.index)} : ${module.name}`);
         try {
             await retryNavigate(page, module.value, module.name);
         }
@@ -164,8 +157,8 @@ const collectChapters = async (page, modules, course, options) => {
         })
 
         newChapters = newChapters.map(newChapter => {
-            newChapter.module = 'Module ' + numberToString(index) + ' ' + module.name;
-            newChapter.moduleNum = numberToString(index);
+            newChapter.module = 'Module ' + numberToString(module.index) + ' ' + module.name;
+            newChapter.moduleNum = numberToString(module.index);
             return newChapter;
         })
 
@@ -181,6 +174,23 @@ const collectChapters = async (page, modules, course, options) => {
     
 }
 
+const promptModules = async (modules) => {
+    var questions = [
+    {
+        type: 'checkbox',
+        name: 'modules',
+        message: 'Quel modules voulez vous télécharger?',
+        choices: modules
+    }
+    ];
+    
+    return await inquirer.prompt(questions)
+}
+
+const filterSelectedModules = function(modules, selectedModules) {
+    return modules.filter(module => selectedModules.indexOf(module.value) >= 0);
+}
+
 const collectModules = async (page, course, options) => {
     console.group('Courses ' + course.title);
     console.log('Loading course page')
@@ -193,7 +203,17 @@ const collectModules = async (page, course, options) => {
         return modules;
     })
 
-    await collectChapters(page, modules, course, options).catch(async (e) => {
+
+    const checkboxModules = modules.map((module, index) => {
+        module.checked = true;
+        module.index = index + 1;
+        return module;
+    })
+
+    let selectedModules = await promptModules(checkboxModules);
+    selectedModules = filterSelectedModules(modules, selectedModules.modules);
+
+    await collectChapters(page, selectedModules, course, options).catch(async (e) => {
         await page.screenshot({ path: "error.png" })
         throw e;
     });
@@ -231,7 +251,7 @@ const promptCredentials = async () => {
     {
         type: 'input',
         name: 'root_path',
-        message: 'Dossier de télécahrgement',
+        message: 'Dossier de téléchargement',
         default : ROOT_DOWNLOAD
     }
     ];
@@ -284,18 +304,20 @@ const launch = async () => {
     await browser.close();
 }
 
-launch()
-.then(() => {
-    if (errors.length > 0) {
-        console.error("\x1b[31m", 'Job finished but some errors occured :');
-        errors.forEach(error => {
-            console.error("\x1b[31m", error);
-        })
-    }
-    console.log(`Finished, enjoy learning: Videos processed=${numberProcessedVideos}, Videos downloaded=${numberDownloadedVideos}`);
-    process.exit(0);
-})
-.catch(e => {
-    console.error(e);
-    process.exit(1);
-});
+if (require.main === module) {
+    launch()
+    .then(() => {
+        if (errors.length > 0) {
+            console.error("\x1b[31m", 'Job finished but some errors occured :');
+            errors.forEach(error => {
+                console.error("\x1b[31m", error);
+            })
+        }
+        console.log(`Finished, enjoy learning: Videos processed=${numberProcessedVideos}, Videos downloaded=${numberDownloadedVideos}`);
+        process.exit(0);
+    })
+    .catch(e => {
+        console.error(e);
+        process.exit(1);
+    });
+}
