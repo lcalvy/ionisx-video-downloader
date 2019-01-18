@@ -11,6 +11,7 @@ const ROOT_DOWNLOAD = path.join('.','download');
 const errors = [];
 let numberProcessedVideos = 0;
 let numberDownloadedVideos = 0;
+let numberDownloadedPDF = 0;
 const numberToString = function(num) {
     const longString = ('000'  + num);
     return longString.substring(longString.length -3, longString.length);
@@ -83,14 +84,14 @@ const lookupHtmlVideo = async (page, chapter, course, rootPath, index) => {
         const videoTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index)} ${chapter.name}`);
         const folder = path.join(rootPath, sanitize(course), sanitize(chapter.module));
         try {
-            const dwloaded = await videoLib.downloadFile(srcVideo, folder, videoTitle);
+            const dwloaded = await videoLib.downloadFile(srcVideo, folder, videoTitle + '.mp4');
             if (dwloaded === true) {
                 numberDownloadedVideos++;
             }
         }
         catch(e1) {
             try {
-                const dwloaded = await videoLib.downloadFile(srcVideo, folder, videoTitle);
+                const dwloaded = await videoLib.downloadFile(srcVideo, folder, videoTitle + '.mp4');
                 if (dwloaded === true) {
                     numberDownloadedVideos++;
                 }
@@ -98,6 +99,39 @@ const lookupHtmlVideo = async (page, chapter, course, rootPath, index) => {
             catch(e2) {
                 console.error(e2, 'on', srcVideo);
                 errors.push(`Unable to download video ${course} ${chapter.name} ${srcVideo}`)
+            }
+        }
+        return true;
+}
+
+const lookupPDF = async (page, chapter, course, rootPath, index) => {
+    const srcPDF = await page.$eval(".pdf-download-button a", el => el.href, {timeout: 5000})
+        .catch(() => {
+            console.log('No PDF file available');
+        })
+        if (!srcPDF) {
+            return false;
+        }
+        
+        numberProcessedVideos++;
+        const pdfTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index)} ${chapter.name}`);
+        const folder = path.join(rootPath, sanitize(course), sanitize(chapter.module));
+        try {
+            const dwloaded = await videoLib.downloadFile(srcPDF, folder, pdfTitle+ '.pdf');
+            if (dwloaded === true) {
+                numberDownloadedPDF++;
+            }
+        }
+        catch(e1) {
+            try {
+                const dwloaded = await videoLib.downloadFile(pdfTitle, folder, pdfTitle + '.pdf');
+                if (dwloaded === true) {
+                    numberDownloadedPDF++;
+                }
+            }
+            catch(e2) {
+                console.error(e2, 'on', srcPDF);
+                errors.push(`Unable to download pdf ${course} ${chapter.name} ${srcPDF}`)
             }
         }
         return true;
@@ -135,6 +169,8 @@ const downloadChapters = async (page, chapters, course, options) => {
         if (!found) {
             await lookupHtmlVideo(page, chapter, course, options.root_path, index);
         }
+
+        await lookupPDF(page, chapter, course, options.root_path, index); 
        
         
         console.groupEnd();
@@ -320,7 +356,7 @@ if (require.main === module) {
                 console.error("\x1b[31m", error);
             })
         }
-        console.log(`Finished, enjoy learning: Videos processed=${numberProcessedVideos}, Videos downloaded=${numberDownloadedVideos}`);
+        console.log(`Finished, enjoy learning: Videos processed=${numberProcessedVideos}, Videos downloaded=${numberDownloadedVideos}, PDF downloaded=${numberDownloadedPDF}`);
         process.exit(0);
     })
     .catch(e => {
