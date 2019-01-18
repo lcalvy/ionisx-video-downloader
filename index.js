@@ -49,13 +49,17 @@ const lookupYoutube = async (page, chapter, course, rootPath, index) => {
         const videoTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index)} ${chapter.name}`);
         const folder = path.join(rootPath, sanitize(course), sanitize(chapter.module));
         try {
-            await videoLib.downloadYoutubeUrl(srcYoutube, folder, videoTitle);
-            numberDownloadedVideos++;
+            const dwloaded = await videoLib.downloadYoutubeUrl(srcYoutube, folder, videoTitle);
+            if (dwloaded === true) {
+                numberDownloadedVideos++;
+            }
         }
         catch(e1) {
             try {
-                await videoLib.downloadYoutubeUrl(srcYoutube, folder, videoTitle);
-                numberDownloadedVideos++;
+                const dwloaded = await videoLib.downloadYoutubeUrl(srcYoutube, folder, videoTitle);
+                if (dwloaded === true) {
+                    numberDownloadedVideos++;
+                }
             }
             catch(e2) {
                 console.error(e2, 'on', srcYoutube);
@@ -79,13 +83,17 @@ const lookupHtmlVideo = async (page, chapter, course, rootPath, index) => {
         const videoTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index)} ${chapter.name}`);
         const folder = path.join(rootPath, sanitize(course), sanitize(chapter.module));
         try {
-            await videoLib.downloadFile(srcVideo, folder, videoTitle);
-            numberDownloadedVideos++;
+            const dwloaded = await videoLib.downloadFile(srcVideo, folder, videoTitle);
+            if (dwloaded === true) {
+                numberDownloadedVideos++;
+            }
         }
         catch(e1) {
             try {
-                await videoLib.downloadFile(srcVideo, folder, videoTitle);
-                numberDownloadedVideos++;
+                const dwloaded = await videoLib.downloadFile(srcVideo, folder, videoTitle);
+                if (dwloaded === true) {
+                    numberDownloadedVideos++;
+                }
             }
             catch(e2) {
                 console.error(e2, 'on', srcVideo);
@@ -151,7 +159,7 @@ const collectChapters = async (page, modules, course, options) => {
         await page.waitForSelector('.chapter li');
         let newChapters = await page.evaluate(() => {
             const chapters = [];
-            document.querySelectorAll('.chapter li a').forEach(dom => chapters.push({name: dom.querySelector('p').innerText, value: dom.href}))
+            document.querySelectorAll('.chapter li a').forEach(dom => chapters.push({name: dom.querySelector('p').innerText.replace(', current section', ''), value: dom.href}))
             return chapters;
         })
 
@@ -242,7 +250,7 @@ const promptCredentials = async () => {
         default : process.argv[2]
     },
     {
-        type: 'input',
+        type: 'password',
         name: 'password',
         message: 'Quel est votre mot de passe (ne sera pas stocké) ? ',
         default : process.argv[3]
