@@ -1,6 +1,6 @@
 {
   "name": "ionisx-video-downloader",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Download all ionisx.com videos",
   "main": "index.js",
   "scripts": {
@@ -12,7 +12,7 @@
   "dependencies": {
     "inquirer": "^6.2.1",
     "mkdir-recursive": "^0.4.0",
-    "puppeteer": "^1.11.0",
+    "puppeteer": "^1.14.0",
     "request": "^2.88.0",
     "request-progress": "^3.0.0",
     "sanitize-filename": "^1.6.1",

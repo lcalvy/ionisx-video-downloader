@@ -302,23 +302,23 @@ const promptCredentials = async () => {
     return await inquirer.prompt(questions)
 }
 
-
 const launch = async () => {
     const credentials  = await promptCredentials();
-    const browser = await puppeteer.launch({headless: true});
+    const browser = await puppeteer.launch({headless: false});
     const url = 'https://ionisx.com/auth/azure-ecoles';
     const page = await browser.newPage();
     page.on('dialog', async dialog => {
     console.log(dialog.message());
         await dialog.accept();
     });
-    await page.setViewport({ width: 1980, height: 1260 })
+    await page.setViewport({ width: 1980, height: 1260, deviceScaleFactor: 2 })
     await page.goto(url);
     console.log(`Connecting on office 365`)
     await page.focus('#i0116');
     await page.type('#i0116' ,credentials.login); // your login here
     page.click('#idSIButton9');
-    await page.waitForNavigation();
+    await page.waitForSelector('#i0118', { visible: true});
+    await sleep(2000);
     await page.focus('#i0118');
     await page.type('#i0118', credentials.password); // your login here
     page.click('#idSIButton9');
