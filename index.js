@@ -89,7 +89,7 @@ const lookupHtmlVideo = async (page, chapter, course, rootPath, index) => {
         if (!srcVideos || srcVideos.length === 0) {
             return false;
         }
-        
+
         await asyncForEach(srcVideos, async (srcVideo, videoIndex) => {
             numberProcessedVideos++;
             const videoTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index)} ${chapter.name} #${numberToString(videoIndex+1)}`);
@@ -285,7 +285,7 @@ const promptCourses = async (courses) => {
         choices: courses
     }
     ];
-    
+
     return await inquirer.prompt(questions)
 }
 
@@ -310,7 +310,7 @@ const promptCredentials = async () => {
         default : ROOT_DOWNLOAD
     }
     ];
-    
+
     return await inquirer.prompt(questions)
 }
 
