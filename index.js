@@ -37,103 +37,116 @@ const retryNavigate = async (page, url, contextInfo) => {
         });
 }
 
+const asyncForEach = async function (array, callback) {
+    for (let index = 0; index < array.length; index++) {
+        // eslint-disable-next-line callback-return
+        await callback(array[index], index, array);
+    }
+  }
+
 const lookupYoutube = async (page, chapter, course, rootPath, index) => {
-    const srcYoutube = await page.$eval("iframe[title='YouTube video player']", el => el.src, {timeout: 5000})
+    const srcYoutubes = await page.$$eval("iframe[title='YouTube video player']", els => els.map(el => el.src))
         .catch(() => {
             console.log('No Youtube embed video available');
         })
-        if (!srcYoutube) {
+        if (!srcYoutubes || srcYoutubes.length === 0) {
             return false;
         }
-        
-        numberProcessedVideos++;
-        const videoTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index)} ${chapter.name}`);
-        const folder = path.join(rootPath, sanitize(course), sanitize(chapter.module));
-        try {
-            const dwloaded = await videoLib.downloadYoutubeUrl(srcYoutube, folder, videoTitle);
-            if (dwloaded === true) {
-                numberDownloadedVideos++;
-            }
-        }
-        catch(e1) {
+
+        await asyncForEach(srcYoutubes, async (srcYoutube, videoIndex) => {
+            numberProcessedVideos++;
+            const videoTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index)} ${chapter.name} #${numberToString(videoIndex+1)}`);
+            const folder = path.join(rootPath, sanitize(course), sanitize(chapter.module));
             try {
                 const dwloaded = await videoLib.downloadYoutubeUrl(srcYoutube, folder, videoTitle);
                 if (dwloaded === true) {
                     numberDownloadedVideos++;
                 }
             }
-            catch(e2) {
-                console.error(e2, 'on', srcYoutube);
-                errors.push(`Unable to download video ${course} ${chapter.name} ${srcYoutube}`)
+            catch(e1) {
+                try {
+                    const dwloaded = await videoLib.downloadYoutubeUrl(srcYoutube, folder, videoTitle);
+                    if (dwloaded === true) {
+                        numberDownloadedVideos++;
+                    }
+                }
+                catch(e2) {
+                    console.error(e2, 'on', srcYoutube);
+                    errors.push(`Unable to download video ${course} ${chapter.name} ${srcYoutube}`)
+                }
             }
-        }
+        })
+
         return true;
 }
 
 
 const lookupHtmlVideo = async (page, chapter, course, rootPath, index) => {
-    const srcVideo = await page.$eval("video source", el => el.src, {timeout: 5000})
+    const srcVideos = await page.$$eval("video source", els => els.map(el => el.src))
         .catch(() => {
             console.log('No video player available');
         })
-        if (!srcVideo) {
+        if (!srcVideos || srcVideos.length === 0) {
             return false;
         }
         
-        numberProcessedVideos++;
-        const videoTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index)} ${chapter.name}`);
-        const folder = path.join(rootPath, sanitize(course), sanitize(chapter.module));
-        try {
-            const dwloaded = await videoLib.downloadFile(srcVideo, folder, videoTitle + '.mp4');
-            if (dwloaded === true) {
-                numberDownloadedVideos++;
-            }
-        }
-        catch(e1) {
+        await asyncForEach(srcVideos, async (srcVideo, videoIndex) => {
+            numberProcessedVideos++;
+            const videoTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index)} ${chapter.name} #${numberToString(videoIndex+1)}`);
+            const folder = path.join(rootPath, sanitize(course), sanitize(chapter.module));
             try {
                 const dwloaded = await videoLib.downloadFile(srcVideo, folder, videoTitle + '.mp4');
                 if (dwloaded === true) {
                     numberDownloadedVideos++;
                 }
             }
-            catch(e2) {
-                console.error(e2, 'on', srcVideo);
-                errors.push(`Unable to download video ${course} ${chapter.name} ${srcVideo}`)
+            catch(e1) {
+                try {
+                    const dwloaded = await videoLib.downloadFile(srcVideo, folder, videoTitle + '.mp4');
+                    if (dwloaded === true) {
+                        numberDownloadedVideos++;
+                    }
+                }
+                catch(e2) {
+                    console.error(e2, 'on', srcVideo);
+                    errors.push(`Unable to download video ${course} ${chapter.name} ${srcVideo}`)
+                }
             }
-        }
+        });
         return true;
 }
 
 const lookupPDF = async (page, chapter, course, rootPath, index) => {
-    const srcPDF = await page.$eval(".pdf-download-button a", el => el.href, {timeout: 5000})
+    const srcPDFs = await page.$$eval(".pdf-download-button a", els => els.map(el => el.href))
         .catch(() => {
             console.log('No PDF file available');
         })
-        if (!srcPDF) {
+        if (!srcPDFs || srcPDFs.length === 0) {
             return false;
         }
-        
-        numberProcessedVideos++;
-        const pdfTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index)} ${chapter.name}`);
-        const folder = path.join(rootPath, sanitize(course), sanitize(chapter.module));
-        try {
-            const dwloaded = await videoLib.downloadFile(srcPDF, folder, pdfTitle+ '.pdf');
-            if (dwloaded === true) {
-                numberDownloadedPDF++;
-            }
-        }
-        catch(e1) {
+        await asyncForEach(srcPDFs, async (srcPDF, pdfIndex) => {
+            numberProcessedVideos++;
+            const pdfTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index)} ${chapter.name} #${numberToString(pdfIndex+1)}`);
+            const folder = path.join(rootPath, sanitize(course), sanitize(chapter.module));
             try {
-                const dwloaded = await videoLib.downloadFile(pdfTitle, folder, pdfTitle + '.pdf');
+                const dwloaded = await videoLib.downloadFile(srcPDF, folder, pdfTitle+ '.pdf');
                 if (dwloaded === true) {
                     numberDownloadedPDF++;
                 }
             }
-            catch(e2) {
-                console.error(e2, 'on', srcPDF);
-                errors.push(`Unable to download pdf ${course} ${chapter.name} ${srcPDF}`)
+            catch(e1) {
+                try {
+                    const dwloaded = await videoLib.downloadFile(pdfTitle, folder, pdfTitle + '.pdf');
+                    if (dwloaded === true) {
+                        numberDownloadedPDF++;
+                    }
+                }
+                catch(e2) {
+                    console.error(e2, 'on', srcPDF);
+                    errors.push(`Unable to download pdf ${course} ${chapter.name} ${srcPDF}`)
+                }
             }
-        }
+        });
         return true;
 }
 
@@ -164,15 +177,14 @@ const downloadChapters = async (page, chapters, course, options) => {
             console.groupEnd();
             continue;
         }
-        
+
         const found = await lookupYoutube(page, chapter, course, options.root_path, index);
         if (!found) {
             await lookupHtmlVideo(page, chapter, course, options.root_path, index);
         }
 
-        await lookupPDF(page, chapter, course, options.root_path, index); 
-       
-        
+        await lookupPDF(page, chapter, course, options.root_path, index);
+
         console.groupEnd();
     }
     console.groupEnd();
