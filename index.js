@@ -15,7 +15,7 @@ let numberDownloadedPDF = 0;
 const numberToString = function(num) {
     const longString = ('000'  + num);
     return longString.substring(longString.length -3, longString.length);
-} 
+}
 
 const sleep = function(ms) {
     return new Promise(resolve => {
@@ -53,9 +53,13 @@ const lookupYoutube = async (page, chapter, course, rootPath, index) => {
             return false;
         }
 
-        await asyncForEach(srcYoutubes, async (srcYoutube, videoIndex) => {
+        await asyncForEach(srcYoutubes, async (srcYoutube, fileIndex) => {
             numberProcessedVideos++;
-            const videoTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index)} ${chapter.name} #${numberToString(videoIndex+1)}`);
+            let fileIndexSuffix = '';
+            if(fileIndex > 0) {
+                fileIndexSuffix = '.' + numberToString(fileIndex + 1);
+            }
+            const videoTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index) + fileIndexSuffix} ${chapter.name}`);
             const folder = path.join(rootPath, sanitize(course), sanitize(chapter.module));
             try {
                 const dwloaded = await videoLib.downloadYoutubeUrl(srcYoutube, folder, videoTitle);
@@ -90,9 +94,13 @@ const lookupHtmlVideo = async (page, chapter, course, rootPath, index) => {
             return false;
         }
 
-        await asyncForEach(srcVideos, async (srcVideo, videoIndex) => {
+        await asyncForEach(srcVideos, async (srcVideo, fileIndex) => {
             numberProcessedVideos++;
-            const videoTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index)} ${chapter.name} #${numberToString(videoIndex+1)}`);
+            let fileIndexSuffix = '';
+            if(fileIndex > 0) {
+                fileIndexSuffix = '.' + numberToString(fileIndex + 1);
+            }
+            const videoTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index) + fileIndexSuffix} ${chapter.name}`);
             const folder = path.join(rootPath, sanitize(course), sanitize(chapter.module));
             try {
                 const dwloaded = await videoLib.downloadFile(srcVideo, folder, videoTitle + '.mp4');
@@ -124,9 +132,13 @@ const lookupPDF = async (page, chapter, course, rootPath, index) => {
         if (!srcPDFs || srcPDFs.length === 0) {
             return false;
         }
-        await asyncForEach(srcPDFs, async (srcPDF, pdfIndex) => {
+        await asyncForEach(srcPDFs, async (srcPDF, fileIndex) => {
             numberProcessedVideos++;
-            const pdfTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index)} ${chapter.name} #${numberToString(pdfIndex+1)}`);
+            let fileIndexSuffix = '';
+            if(fileIndex > 0) {
+                fileIndexSuffix = '.' + numberToString(fileIndex + 1);
+            }
+            const pdfTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index) + fileIndexSuffix} ${chapter.name}`);
             const folder = path.join(rootPath, sanitize(course), sanitize(chapter.module));
             try {
                 const dwloaded = await videoLib.downloadFile(srcPDF, folder, pdfTitle+ '.pdf');
