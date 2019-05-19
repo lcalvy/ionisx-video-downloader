@@ -25,11 +25,11 @@ const sleep = function(ms) {
 }
 
 const retryNavigate = async (page, url, contextInfo) => {
-    await page.goto(url, {timeout: 10000})
+    await page.goto(url, {waitUntil: 'networkidle0'})
         .catch(async () => {
             await sleep(5000);
-            await page.goto('https://ionisx.com/dashboard');
-            await page.goto(url).catch(async (e2) => {
+            await page.goto('https://ionisx.com/dashboard',{waitUntil: 'networkidle0'});
+            await page.goto(url, {waitUntil: 'networkidle0'}).catch(async (e2) => {
                 console.error(e2)
                 await page.screenshot({ path: sanitize(url) + '.png' });
                 errors.push(`Unable to navigate to ${contextInfo} ${url}`)
@@ -199,7 +199,6 @@ const downloadChapters = async (page, chapters, course, options) => {
             console.groupEnd();
             continue;
         }
-
         const found = await lookupYoutube(page, chapter, course, options.root_path, index);
         if (!found) {
             await lookupHtmlVideo(page, chapter, course, options.root_path, index);
@@ -346,7 +345,7 @@ const launch = async () => {
         await dialog.accept();
     });
     await page.setViewport({ width: 1980, height: 1260, deviceScaleFactor: 2 })
-    await page.goto(url);
+    await page.goto(url, {waitUntil: 'networkidle0'});
     console.log(`Connecting on office 365`)
     await page.focus('#i0116');
     await page.type('#i0116' ,credentials.login); // your login here
