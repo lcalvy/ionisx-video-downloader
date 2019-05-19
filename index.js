@@ -6,6 +6,7 @@ const puppeteer = require('puppeteer');
 const inquirer = require('inquirer');
 const sanitize = require("sanitize-filename");
 const videoLib = require('./lib/video');
+const mkdirSync = require('mkdir-recursive').mkdirSync;
 
 const ROOT_DOWNLOAD = path.join('.','download');
 const errors = [];
@@ -129,7 +130,7 @@ const lookupPDF = async (page, chapter, course, rootPath, index) => {
         .catch(() => {
             console.log('No PDF file available');
         })
-        if (!srcPDFs || srcPDFs.length === 0) {
+        if ((!srcPDFs || srcPDFs.length === 0) && chapter.name.indexOf('Cours') === -1) {
             return false;
         }
         await asyncForEach(srcPDFs, async (srcPDF, fileIndex) => {
@@ -159,6 +160,15 @@ const lookupPDF = async (page, chapter, course, rootPath, index) => {
                 }
             }
         });
+
+        if (chapter.name.indexOf('Cours') === 0) {
+            const folderPath = path.join(rootPath, sanitize(course), sanitize(chapter.module));
+            mkdirSync(folderPath);
+            const pdfTitle = sanitize(`M${chapter.moduleNum} C${numberToString(index)} ${chapter.name}-page.pdf`);
+            const filePath = path.join(folderPath,  pdfTitle);
+            await page.pdf({ format: 'A4', path:  filePath});
+            numberDownloadedPDF++;
+        }
         return true;
 }
 
